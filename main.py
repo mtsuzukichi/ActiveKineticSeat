@@ -17,13 +17,11 @@ from config import *
 
 from gps_bt_receiver import start_gps_receiver
 from shared_memory_manager import create_shared_memory
-# from plotter import start_plotting_bio, start_plotting_imu, start_plotting_wit, start_plotting_gps, update_map, start_plotting_one_figure
-from plotter import update_map, start_plotting_one_figure
+from plotter_gps import start_plotting_one_figure
 # add mtsuzuki
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'function'))
 
-import signal
 import threading
 import tkinter as tk
 from tkinter import messagebox
@@ -56,6 +54,7 @@ last_saved_indices = {
 
 def main():
 	global gps_process, plot_gps_process
+	global gps_array
 	global plot_one_figure_process
 
 
@@ -79,7 +78,7 @@ def main():
 		gps_process				 = Process(target=start_gps_receiver, 			args=(gps_shared_mem_name,start_time))
 		# plot_gps_process		 = Process(target=start_plotting_gps, 			args=(gps_shared_mem_name,bio_shared_mem_LFHF_name,))
 
-	plot_one_figure_process = Process(target=start_plotting_one_figure,		    args=(bio_shared_mem_name,bio_shared_mem_LFHF_name,bio_shared_mem_Peak_name,imu_shared_mem_name,imu_shared_mem_name_2,wit_shared_mem_name,gps_shared_mem_name))
+	plot_one_figure_process = Process(target=start_plotting_one_figure,		    args=(gps_shared_mem_name,))
 
 	"""実行"""
 	try:
@@ -88,6 +87,9 @@ def main():
 			gps_process.start()
 			# if FIGFLAG:
 			# 	plot_gps_process.start()
+		if FIGFLAG:
+			print("Plot Process started")
+			plot_one_figure_process.start()
 
 		if USEFLAG_GPS:
 			gps_process.join()
@@ -306,7 +308,7 @@ def save_data():
                 # htmlファイルに地図データを保存
 				lon = gps_data_to_save[:, 4]  # longitude
 				lat = gps_data_to_save[:, 3]  # latitude
-				update_map(lat, lon, map_file=savedir + u"/gps_data.html")
+				# update_map(lat, lon, map_file=savedir + u"/gps_data.html")
 
 		except Exception as e:
 			print(f"An error occurred while saving data: {e}")

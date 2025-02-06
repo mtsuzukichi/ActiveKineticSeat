@@ -1,0 +1,15 @@
+2025.02.06
+ vscodeのログイン関係
+  https://aisumegane.com/github_vscode_you-do-not-have-permission-to-push-to-on-github_gitgraph_vscode/
+
+  新たにアクティブキネティックシート用のリポジトリを作成したときにプッシュできなかったので、
+  vscodeでのログイン関係をやり直し（上記urlを参照）
+
+ 仮想環境作成
+   python.exe -m venv .AKSTB （毎回コマンド忘れる）
+
+ 必要ライブラリのリスト作成 
+   pip freeze > requirements.txt
+
+ requirements.txtを使って必要ライブラリのインストール
+ 　pip install -r requirements.txt
