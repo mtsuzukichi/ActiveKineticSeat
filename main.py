@@ -293,7 +293,8 @@ def save_data():
 
 
 			if USEFLAG_GPS:
-				gps_index = int(np.max(gps_array[:, 1]))
+				# gps_index = int(np.max(gps_array[:, 1]))
+				gps_index = int(np.argmax(gps_array[:, 0]))
 				gps_data_to_save = gps_array[last_saved_indices['gps']:gps_index + 1]
 				file_path = savedir + u"/gps_data.txt"
 				if not os.path.exists(file_path):
