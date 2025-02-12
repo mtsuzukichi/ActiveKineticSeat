@@ -25,11 +25,23 @@ from geopy.distance import geodesic
 
 from adjustText import adjust_text
 
+# フラグ判定モード（"circle"=円判定, "line"=ライン判定）
+flag_mode = "circle"
+# flag_mode = "line"
 
 # circle_origin = (35.0549, 137.1631)  # 本社T/C入口
-# circle_origin = (35.0532, 137.1653)  # 東バンク入口
-circle_origin = (3.495835912666666611e+01,1.371432051900000033e+02)  # 自宅付近 テスト用
+circle_origin = (35.0532, 137.1653)  # 東バンク入口
+# circle_origin = (3.495835912666666611e+01,1.371432051900000033e+02)  # 自宅付近 テスト用
 circle_radius_m = 1  # 円の半径をメートル単位で指定
+
+# ラインの定義（2点で決まる）
+line_point1 = (35.0531, 137.1653)  # ライン 東バンク１
+line_point2 = (35.0532, 137.1655)  # ライン 東バンク２
+
+# 直前の位置を保持（初回はNone）
+prev_lat = None
+prev_lon = None
+
 
 # グローバル変数としてロックを保持
 global_lock = Lock()
@@ -115,7 +127,27 @@ def check_position_in_circle(current_lat, current_lon, circle_lat, circle_lon, c
 
     return inside_flag
 
+def crosses_line(prev_lat, prev_lon, curr_lat, curr_lon, line_point1, line_point2):
+    """現在位置と前回の位置が指定ラインをまたいだかどうかを判定"""
+    if prev_lat is None or prev_lon is None:
+        return False  # 初回は判定しない
+
+    def ccw(A, B, C):
+        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+    A = (prev_lon, prev_lat)
+    B = (curr_lon, curr_lat)
+    C = (line_point1[1], line_point1[0])
+    D = (line_point2[1], line_point2[0])
+
+    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+
+
+
 def start_plotting_one_figure(shared_mem_name_GPS):
+
+    prev_lat = None
+    prev_lon = None
 
     config = read_config()
     USEFLAG_GPS        = int(config['DEFAULT']['USEFLAG_GPS'])
@@ -153,9 +185,13 @@ def start_plotting_one_figure(shared_mem_name_GPS):
         lat_radius, lon_radius = meters_to_degrees(circle_radius_m, circle_origin[0])
 
         # 円をあらかじめ設定した中心に配置
-        circle = patches.Circle(circle_origin[::-1], lon_radius, color='blue', alpha=0.1, fill=True)
-        ax12.add_patch(circle)
-        ax12.scatter(circle_origin[1], circle_origin[0], color='blue', marker='o', s=100, label="Center Point")
+        if flag_mode == "circle":
+            circle = patches.Circle(circle_origin[::-1], lon_radius, color='blue', alpha=0.1, fill=True)
+            ax12.add_patch(circle)
+            ax12.scatter(circle_origin[1], circle_origin[0], color='blue', marker='o', s=100, label="Center Point")
+        elif flag_mode == "line":
+            ax12.plot([line_point1[1], line_point2[1]], [line_point1[0], line_point2[0]], 'r-', linewidth=3, label="Threshold Line")
+
 
         ax13 = fig.add_subplot(gs[5:10, 0:2])
         line13, = ax13.plot([], [], 'k-')
@@ -216,7 +252,14 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                     current_lon = array_gps_ExcludeZero_interp[-1, 4]
                     current_time = array_gps_ExcludeZero_interp[-1, 0]
 
-                    activate_flag = check_position_in_circle(current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12)
+                    if flag_mode == "circle":
+                        activate_flag = check_position_in_circle(
+                            current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12
+                        )
+                    elif flag_mode == "line":
+                        activate_flag = crosses_line(prev_lat, prev_lon, current_lat, current_lon, line_point1, line_point2)
+
+                    # activate_flag = check_position_in_circle(current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12)
                     print("activate_flag:",activate_flag)
 
                     time_history.append(current_time)
@@ -230,6 +273,9 @@ def start_plotting_one_figure(shared_mem_name_GPS):
 
                     ax13.relim()
                     ax13.autoscale_view()
+
+                    # 位置を更新
+                    prev_lat, prev_lon = current_lat, current_lon
 
             plt.draw()
             plt.pause(0.05)
