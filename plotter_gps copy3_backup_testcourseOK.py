@@ -25,12 +25,9 @@ from geopy.distance import geodesic
 
 from adjustText import adjust_text
 
-import serial,sys,time
-
-
 # フラグ判定モード（"circle"=円判定, "line"=ライン判定）
-# flag_mode = "circle"
-flag_mode = "line"
+flag_mode = "circle"
+# flag_mode = "line"
 
 # circle_origin = (35.0549, 137.1631)  # 本社T/C入口
 circle_origin = (35.0532, 137.1653)  # 東バンク入口
@@ -38,14 +35,13 @@ circle_origin = (35.0532, 137.1653)  # 東バンク入口
 circle_radius_m = 1  # 円の半径をメートル単位で指定
 
 # ラインの定義（2点で決まる）
-# line_point1 = (35.0531, 137.1653)  # ライン 東バンク１
-# line_point2 = (35.0532, 137.1655)  # ライン 東バンク２
-line_point1 = (35.0550, 137.1609)  # ライン 構内路 オーバーブリッジ手前
-line_point2 = (35.0550, 137.1611)  # ライン 構内路 オーバーブリッジ手前
+line_point1 = (35.0531, 137.1653)  # ライン 東バンク１
+line_point2 = (35.0532, 137.1655)  # ライン 東バンク２
 
 # 直前の位置を保持（初回はNone）
 prev_lat = None
 prev_lon = None
+
 
 # グローバル変数としてロックを保持
 global_lock = Lock()
@@ -150,10 +146,6 @@ def crosses_line(prev_lat, prev_lon, curr_lat, curr_lon, line_point1, line_point
 
 def start_plotting_one_figure(shared_mem_name_GPS):
 
-    # ハプティックデバイス
-    ser = serial.Serial("COM18",921600)
-
-    activate_flag = 0
     prev_lat = None
     prev_lon = None
 
@@ -290,12 +282,3 @@ def start_plotting_one_figure(shared_mem_name_GPS):
             plt.show(block=False)
 
             fig.tight_layout()
-
-            print(activate_flag)
-            if activate_flag == 1:
-                stime = 1.0
-                ser.write(bytearray([ord('p'), 0,0b1]))
-                time.sleep(stime)
-                ser.write(bytearray([ord('p'), 0,0]))
-                time.sleep(stime)
-
