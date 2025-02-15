@@ -29,33 +29,19 @@ import serial,sys,time
 
 
 # フラグ判定モード（"circle"=円判定, "line"=ライン判定）
-# flag_mode = "circle"
-flag_mode = "line"
+flag_mode = "circle"
+# flag_mode = "line"
 
 # circle_origin = (35.0549, 137.1631)  # 本社T/C入口
 # circle_origin = (35.0532, 137.1653)  # 東バンク入口
 circle_origin = (3.495835912666666611e+01,1.371432051900000033e+02)  # 自宅付近 テスト用
-circle_radius_m = 3  # 円の半径をメートル単位で指定
+circle_radius_m = 1  # 円の半径をメートル単位で指定
 
 # ラインの定義（2点で決まる）
 # line_point1 = (35.0531, 137.1653)  # ライン 東バンク１
 # line_point2 = (35.0532, 137.1655)  # ライン 東バンク２
-# line_point1 = (35.0550, 137.1609)  # ライン 本社 構内路 オーバーブリッジ手前
-# line_point2 = (35.0550, 137.1611)  # ライン 本社 構内路 オーバーブリッジ手前
-line_point1 = (35.222120, 138.903772)  # ライン 東富士 第二水直 南側
-line_point2 = (35.222156, 138.903682)  # ライン 東富士 第二水直 南側
-
-
-line_segments = [
-    # ((34.958242, 137.143170), (34.958405, 137.143268)),  # 自宅 テスト用ライン１
-    # ((34.958263, 137.143110), (34.958422, 137.143223)),  # 自宅 テスト用ライン２
-    ((34.958177, 137.143282), (34.958190, 137.143408)),  # 自宅 テスト用ライン１
-    ((34.958229, 137.143353), (34.958422, 137.143223)),  # 自宅 テスト用ライン２
-    # ((35.222120, 138.903772), (35.222156, 138.903682)),  # 東富士 第二水直 南側
-    # ((35.228230, 138.907711), (35.228202, 138.907791)),  # 東富士 第二水直 北側
-    # 必要に応じて追加
-]
-
+line_point1 = (35.0550, 137.1609)  # ライン 構内路 オーバーブリッジ手前
+line_point2 = (35.0550, 137.1611)  # ライン 構内路 オーバーブリッジ手前
 
 # 直前の位置を保持（初回はNone）
 prev_lat = None
@@ -160,29 +146,18 @@ def crosses_line(prev_lat, prev_lon, curr_lat, curr_lon, line_point1, line_point
 
     return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
 
-def crosses_any_line(prev_lat, prev_lon, curr_lat, curr_lon, line_segments):
-    """現在位置と前回の位置が指定された複数のラインのいずれかをまたいだか判定"""
-    if prev_lat is None or prev_lon is None:
-        return False  # 初回は判定しない
-
-    for line_point1, line_point2 in line_segments:
-        if crosses_line(prev_lat, prev_lon, curr_lat, curr_lon, line_point1, line_point2):
-            return True  # どれかのラインをまたいでいたら即座に True を返す
-    return False  # どのラインもまたいでいない
 
 
 def start_plotting_one_figure(shared_mem_name_GPS):
 
     # ハプティックデバイス
     ser = serial.Serial("COM18",921600)
-    delay_HapOn = 0 # 単位：sec
 
     activate_flag = 0
     activate_flag_prev = 0
     prev_lat = None
     prev_lon = None
     current_time = 0
-    flag_on_time = 0
 
     config = read_config()
     USEFLAG_GPS        = int(config['DEFAULT']['USEFLAG_GPS'])
@@ -225,9 +200,8 @@ def start_plotting_one_figure(shared_mem_name_GPS):
             ax12.add_patch(circle)
             ax12.scatter(circle_origin[1], circle_origin[0], color='blue', marker='o', s=100, label="Center Point")
         elif flag_mode == "line":
-            # ax12.plot([line_point1[1], line_point2[1]], [line_point1[0], line_point2[0]], 'r-', linewidth=3, label="Threshold Line")
-            for (point1, point2) in line_segments:
-                ax12.plot([point1[1], point2[1]], [point1[0], point2[0]], 'r-', linewidth=3, label="Threshold Line")
+            ax12.plot([line_point1[1], line_point2[1]], [line_point1[0], line_point2[0]], 'r-', linewidth=3, label="Threshold Line")
+
 
         ax13 = fig.add_subplot(gs[5:10, 0:2])
         line13, = ax13.plot([], [], 'k-')
@@ -293,8 +267,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                             current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12
                         )
                     elif flag_mode == "line":
-                        # activate_flag = crosses_line(prev_lat, prev_lon, current_lat, current_lon, line_point1, line_point2)
-                        activate_flag = crosses_any_line(prev_lat, prev_lon, current_lat, current_lon, line_segments)
+                        activate_flag = crosses_line(prev_lat, prev_lon, current_lat, current_lon, line_point1, line_point2)
 
                     # activate_flag = check_position_in_circle(current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12)
                     print("activate_flag:",activate_flag)
@@ -320,16 +293,10 @@ def start_plotting_one_figure(shared_mem_name_GPS):
 
             fig.tight_layout()
 
+            # フラグが立っている場合はハプティックデバイスを制御
+            delay_HapOn = 2 # 単位：sec
 
-            if activate_flag == 1 and activate_flag_prev == 0:
-                flag_on_time = current_time 
-                print("current_time:",current_time)
-                print("flag_on_time:",flag_on_time)
-
-            print("activate_flag_prev:",activate_flag_prev)
-            print("flag_on_time + delay_HapOn*1000",flag_on_time + delay_HapOn*1000)
-
-            if activate_flag_prev == 1 and current_time > flag_on_time + delay_HapOn*1000:
+            if activate_flag == 1:
                 stime = 1.0
                 ser.write(bytearray([ord('p'), 0,0b1]))
                 time.sleep(stime)
@@ -337,7 +304,3 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                 time.sleep(stime)
 
                 activate_flag_prev = 0
-            
-            # activate_flag の状態を保存
-            activate_flag_prev = activate_flag
-

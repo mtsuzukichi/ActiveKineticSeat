@@ -47,10 +47,8 @@ line_point2 = (35.222156, 138.903682)  # ライン 東富士 第二水直 南側
 
 
 line_segments = [
-    # ((34.958242, 137.143170), (34.958405, 137.143268)),  # 自宅 テスト用ライン１
-    # ((34.958263, 137.143110), (34.958422, 137.143223)),  # 自宅 テスト用ライン２
-    ((34.958177, 137.143282), (34.958190, 137.143408)),  # 自宅 テスト用ライン１
-    ((34.958229, 137.143353), (34.958422, 137.143223)),  # 自宅 テスト用ライン２
+    ((34.958322, 137.143207), (34.958350, 137.143227)),  # 自宅 テスト用ライン１
+    ((34.958349, 137.143187), (34.958372, 137.143200)),  # 自宅 テスト用ライン２
     # ((35.222120, 138.903772), (35.222156, 138.903682)),  # 東富士 第二水直 南側
     # ((35.228230, 138.907711), (35.228202, 138.907791)),  # 東富士 第二水直 北側
     # 必要に応じて追加
@@ -225,9 +223,8 @@ def start_plotting_one_figure(shared_mem_name_GPS):
             ax12.add_patch(circle)
             ax12.scatter(circle_origin[1], circle_origin[0], color='blue', marker='o', s=100, label="Center Point")
         elif flag_mode == "line":
-            # ax12.plot([line_point1[1], line_point2[1]], [line_point1[0], line_point2[0]], 'r-', linewidth=3, label="Threshold Line")
-            for (point1, point2) in line_segments:
-                ax12.plot([point1[1], point2[1]], [point1[0], point2[0]], 'r-', linewidth=3, label="Threshold Line")
+            ax12.plot([line_point1[1], line_point2[1]], [line_point1[0], line_point2[0]], 'r-', linewidth=3, label="Threshold Line")
+
 
         ax13 = fig.add_subplot(gs[5:10, 0:2])
         line13, = ax13.plot([], [], 'k-')
@@ -293,8 +290,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                             current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12
                         )
                     elif flag_mode == "line":
-                        # activate_flag = crosses_line(prev_lat, prev_lon, current_lat, current_lon, line_point1, line_point2)
-                        activate_flag = crosses_any_line(prev_lat, prev_lon, current_lat, current_lon, line_segments)
+                        activate_flag = crosses_line(prev_lat, prev_lon, current_lat, current_lon, line_point1, line_point2)
 
                     # activate_flag = check_position_in_circle(current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12)
                     print("activate_flag:",activate_flag)

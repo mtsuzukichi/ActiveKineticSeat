@@ -10,6 +10,7 @@ def index():
     # start_coords = (34.9158, 134.2189) # 岡山国際サーキット
     # start_coords = (38.1422, 140.7778) # SUGOサーキット
     start_coords = (35.0549, 137.1631) # 本社T/C
+    start_coords = (35.22703636383409, 138.90208082942948) # 東富士研究所
     folium_map = folium.Map(location=start_coords, zoom_start=18) # ズームレベルを上げました
 
     # ポップアップ機能を追加
