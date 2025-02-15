@@ -331,7 +331,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
 
             if activate_flag_prev == 1 and current_time > flag_on_time + delay_HapOn*1000:
                 stime = 1.0
-                ser.write(bytearray([ord('p'), 0,0b1]))
+                ser.write(bytearray([ord('p'), 0,0b1111])) # 4つすべて
                 time.sleep(stime)
                 ser.write(bytearray([ord('p'), 0,0]))
                 time.sleep(stime)
