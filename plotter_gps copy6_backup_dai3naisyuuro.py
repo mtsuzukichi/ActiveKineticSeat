@@ -55,25 +55,14 @@ line_segments = [
     # ((35.228230, 138.907711), (35.228202, 138.907791)),  # 東富士 第二水直 北側
     # ((35.227363, 138.898499), (35.227162, 138.898976)),  # 東富士第1周回路 南バンク
     # ((35.229320, 138.907466), (35.229140, 138.907891)),  # 東富士第1周回路 南バンク
-    # ((35.231023, 138.889509), (35.231027, 138.889901)),  # 東富士第3周回路 内周路１
-    # ((35.232067, 138.888676), (35.231789, 138.888647)),  # 東富士第3周回路 内周路２
-    # ((35.232486, 138.887550), (35.232614, 138.887853)),  # 東富士第3周回路 内周路３
-    # ((35.233201, 138.886413), (35.232819, 138.886490)),  # 東富士第3周回路 内周路４
-    # ((35.234496, 138.885182), (35.234388, 138.885701)),  # 東富士第3周回路 内周路５
-    # ((35.235484, 138.885094), (35.235492, 138.885678)),  # 東富士第3周回路 内周路６
-    # ((35.233363, 138.888180), (35.233004, 138.888113)),  # 東富士第3周回路 内周路７
-    # ((35.231023, 138.889509), (35.231027, 138.889901), 0),  # 東富士第3周回路 内周路１
-    ((35.230841, 138.889401), (35.230813, 138.889936), 0),  # 東富士第3周回路 内周路１
-    # ((35.232067, 138.888676), (35.231789, 138.888647), 0),  # 東富士第3周回路 内周路２
-    ((35.232091, 138.888844), (35.231729, 138.888825), 0),  # 東富士第3周回路 内周路２
-    # ((35.232486, 138.887550), (35.232614, 138.887853), 0),  # 東富士第3周回路 内周路３
-    ((35.232522, 138.887481), (35.232571, 138.887966), 0),  # 東富士第3周回路 内周路３
-    # ((35.233201, 138.886413), (35.232819, 138.886490), 0),  # 東富士第3周回路 内周路４
-    ((35.233258, 138.886680), (35.232938, 138.886735), 0),  # 東富士第3周回路 内周路４
-    # ((35.234496, 138.885182), (35.234388, 138.885701), 0),  # 東富士第3周回路 内周路５
-    ((35.234392, 138.885085), (35.234292, 138.885730), 0),  # 東富士第3周回路 内周路５
-    ((35.235484, 138.885094), (35.235492, 138.885678), 0),  # 東富士第3周回路 内周路６
-    ((35.233363, 138.888180), (35.233004, 138.888113), 0),  # 東富士第3周回路 内周路７
+    ((35.231023, 138.889509), (35.231027, 138.889901)),  # 東富士第3周回路 内周路１
+    ((35.232067, 138.888676), (35.231789, 138.888647)),  # 東富士第3周回路 内周路２
+    ((35.232486, 138.887550), (35.232614, 138.887853)),  # 東富士第3周回路 内周路３
+    ((35.233201, 138.886413), (35.232819, 138.886490)),  # 東富士第3周回路 内周路４
+    ((35.234496, 138.885182), (35.234388, 138.885701)),  # 東富士第3周回路 内周路５
+    ((35.235484, 138.885094), (35.235492, 138.885678)),  # 東富士第3周回路 内周路６
+    ((35.233363, 138.888180), (35.233004, 138.888113)),  # 東富士第3周回路 内周路７
+
     # 必要に応じて追加
 ]
 
@@ -184,14 +173,12 @@ def crosses_line(prev_lat, prev_lon, curr_lat, curr_lon, line_point1, line_point
 def crosses_any_line(prev_lat, prev_lon, curr_lat, curr_lon, line_segments):
     """現在位置と前回の位置が指定された複数のラインのいずれかをまたいだか判定"""
     if prev_lat is None or prev_lon is None:
-        return False, 0  # 初回は判定しない
+        return False  # 初回は判定しない
 
-    for line_point1, line_point2, delay in line_segments:
+    for line_point1, line_point2 in line_segments:
         if crosses_line(prev_lat, prev_lon, curr_lat, curr_lon, line_point1, line_point2):
-            # return True  # どれかのラインをまたいでいたら即座に True を返す
-            return True, delay  # どれかのラインをまたいでいたら即座に True を返す
-    # return False  # どのラインもまたいでいない
-    return False, 0  # どのラインもまたいでいない
+            return True  # どれかのラインをまたいでいたら即座に True を返す
+    return False  # どのラインもまたいでいない
 
 
 def start_plotting_one_figure(shared_mem_name_GPS):
@@ -206,7 +193,6 @@ def start_plotting_one_figure(shared_mem_name_GPS):
     prev_lon = None
     current_time = 0
     flag_on_time = 0
-    flag_HapOn = 0 
 
     config = read_config()
     USEFLAG_GPS        = int(config['DEFAULT']['USEFLAG_GPS'])
@@ -250,7 +236,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
             ax12.scatter(circle_origin[1], circle_origin[0], color='blue', marker='o', s=100, label="Center Point")
         elif flag_mode == "line":
             # ax12.plot([line_point1[1], line_point2[1]], [line_point1[0], line_point2[0]], 'r-', linewidth=3, label="Threshold Line")
-            for (point1, point2, _) in line_segments:
+            for (point1, point2) in line_segments:
                 ax12.plot([point1[1], point2[1]], [point1[0], point2[0]], 'r-', linewidth=3, label="Threshold Line")
 
         ax13 = fig.add_subplot(gs[5:10, 0:2])
@@ -318,10 +304,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                         )
                     elif flag_mode == "line":
                         # activate_flag = crosses_line(prev_lat, prev_lon, current_lat, current_lon, line_point1, line_point2)
-                        activate_flag, tmp_delay_HapOn = crosses_any_line(prev_lat, prev_lon, current_lat, current_lon, line_segments)
-
-                        if activate_flag:
-                            delay_HapOn = tmp_delay_HapOn
+                        activate_flag = crosses_any_line(prev_lat, prev_lon, current_lat, current_lon, line_segments)
 
                     # activate_flag = check_position_in_circle(current_lat, current_lon, circle_origin[0], circle_origin[1], circle_radius_m, ax12)
                     print("activate_flag:",activate_flag)
@@ -352,18 +335,11 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                 flag_on_time = current_time 
                 print("current_time:",current_time)
                 print("flag_on_time:",flag_on_time)
-                flag_HapOn = 1
 
+            print("activate_flag_prev:",activate_flag_prev)
+            print("flag_on_time + delay_HapOn*1000",flag_on_time + delay_HapOn*1000)
 
-            # print("activate_flag_prev:",activate_flag_prev)
-            # print("flag_on_time + delay_HapOn*1000",flag_on_time + delay_HapOn*1000)
-
-            # if activate_flag_prev == 1 and current_time > flag_on_time + delay_HapOn*1000:
-            if flag_HapOn == 1 and current_time > flag_on_time + delay_HapOn*1000:
-                print("current_time:",current_time)
-                print("flag_on_time:",flag_on_time)
-                print("delay_HapOn",delay_HapOn)
-
+            if activate_flag_prev == 1 and current_time > flag_on_time + delay_HapOn*1000:
                 stime = 1.0
                 ser.write(bytearray([ord('p'), 0,0b1111])) # 4つすべて
                 time.sleep(stime)
@@ -371,9 +347,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
                 time.sleep(stime)
 
                 activate_flag_prev = 0
-                flag_HapOn= 0
-
-
+            
             # activate_flag の状態を保存
             activate_flag_prev = activate_flag
 
