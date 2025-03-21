@@ -19,7 +19,8 @@ HTML_TEMPLATE = """
     <div id="map" style="width: 100%; height: 600px;"></div>
     
     <script>
-        var map = L.map('map').setView([35.232, 138.888], 16);
+        // var map = L.map('map').setView([35.232, 138.888], 16);
+        var map = L.map('map').setView([35.16910, 137.05414], 16);
         
         // タイルレイヤー追加
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

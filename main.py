@@ -191,7 +191,7 @@ class MainApp:
 		self.start_button = tk.Button(root, text="  Start Measurement", command=self.start_main,
 									  image=self.Start_icon, compound="left", width=200, height=window_height/5)
 		self.start_button.grid(row=0, column=0, padx=10, pady=10)
-		
+				
 		self.stop_button = tk.Button(root, text="  Stop Measurement", command=self.stop_main,
 									 image=self.Stop_icon, compound="left", width=200, height=window_height/5)
 		self.stop_button.grid(row=1, column=0, padx=10, pady=10)
