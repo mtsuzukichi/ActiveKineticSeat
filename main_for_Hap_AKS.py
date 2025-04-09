@@ -1,32 +1,247 @@
-# plotter.py
 
-import numpy as np
-from multiprocessing import shared_memory
-import config as CON
 
-# add mtsuzuki 
+
+# main.py
 import sys
+from multiprocessing import Process, shared_memory, Lock, shared_memory
+from datetime import datetime
+import numpy as np
+import time
+
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'function'))
 
+import threading
+
+import serial
+import re
+import asyncio
+
+
+# plotter_gps.py
 import scipy.interpolate as interpolate
-
 import pyautogui as pag
-
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
-
 import seaborn as sns
-
-from multiprocessing import Lock
-from config_manager import read_config
-from geopy.distance import geodesic
-
 from adjustText import adjust_text
+import subprocess
 
-import serial,sys,time
 
+
+
+
+"""GPS用Bluetooth設定"""
+MAX_HOURS   = 2
+DURATION = int(MAX_HOURS*60*60)
+
+GPS_BT_ADDRESS = "08:A6:F7:92:74:9A" # GPS 1
+
+# GPS_PORT        = "COM9" #README_hmを参照して設定
+# GPS_PORT        = "COM5" # mtsuzki home PC & stick PC
+# GPS_PORT        = "COM6" # Tough Book Takakura
+# GPS_PORT        = "COM14" # Tough Book GPS_1 
+# GPS_PORT        = "COM16" # Tough Book GPS_2
+GPS_PORT        = "/dev/rfcomm0" # RasberryPi
+GPS_BAUDRATE    = 9600
+GPS_TIMEOUT     = 1
+
+BUFFER_DURATION = DURATION  # バッファの長さを指定する（秒単位）
+RECEIVE_RATE = 10 # データ受信レート（Hz単位）
+BUFFER_SIZE = BUFFER_DURATION * RECEIVE_RATE # バッファサイズを計算
+
+GPS_SHAPE = (int(MAX_HOURS * 60 * 60 * RECEIVE_RATE), 5)  #5列: pc_time, utc_date, utc_time, lat, lon 
+GPS_DTYPE = np.float64
+FLG_SHAPE = (int(MAX_HOURS * 60 * 60 * RECEIVE_RATE), 1)  #1列: flag for Haptic
+FLG_DTYPE = np.int16
+
+USEFLAG_GPS = 1
+FIGFLAG     = 1
+USEFLAG_Hap = 0
+
+SAVEINTERVAL = 10 # ファイル保存間隔 [sec]
+
+
+# 排他処理用設定
+global_lock = Lock()
+
+# グローバル変数
+gps_process = None
+plot_gps_process = None
+plot_one_figure = None
+
+save_directory = None
+save_thread_running = True
+
+# 前回保存したインデックスを記録
+last_saved_indices = {
+    'gps': 0,
+}
+
+
+# --- function GPS Bluetooth connect --------------------------------------
+
+def bind_bluetooth():
+    try:
+        subprocess.run(["sudo", "rfcomm", "bind", "/dev/rfcomm0", GPS_BT_ADDRESS], check=True)
+        print("Bluetooth デバイスと接続されました。")
+    except subprocess.CalledProcessError as e:
+        print("Bluetooth 接続に失敗しました。", e)
+
+# --- function save --------------------------------------
+
+
+def stop_processes():
+
+	if USEFLAG_GPS:
+		gps_process.terminate()
+		# if FIGFLAG:
+		# 	plot_gps_process.terminate()
+
+	plot_one_figure_process.terminate()
+
+	print("Acquisition stopped by user.")
+
+# 定期ファイル保存機能追加
+def save_data_periodically(interval=60):
+    # while True:
+    #     time.sleep(interval)
+    #     save_data()
+	global save_thread_running
+	while save_thread_running:
+		time.sleep(interval)
+		save_data()
+
+def save_data():
+	global save_directory
+
+	with global_lock:
+		print("Saving Data (periodically)...")
+		now = datetime.now()
+		savedatetime = now.strftime("%Y%m%d%H%M%S")
+
+		if save_directory is None:
+			save_directory = u'./savedata/SaveData_' + savedatetime
+			os.makedirs(save_directory, exist_ok=True)
+
+		savedir = save_directory
+		fmt = '%.18e'  # 科学記数法で出力するフォーマット
+
+		try:
+
+
+			if USEFLAG_GPS:
+				# gps_index = int(np.max(gps_array[:, 1]))
+				gps_index = int(np.argmax(gps_array[:, 0]))
+				gps_data_to_save = gps_array[last_saved_indices['gps']:gps_index + 1]
+				file_path = savedir + u"/gps_data.txt"
+				if not os.path.exists(file_path):
+					header = "pc_time, utc_date, utc_time, lat, lon"
+				else:
+					header = ''
+				with open(savedir + u"/gps_data.txt", 'a') as f:
+					np.savetxt(f, gps_data_to_save, delimiter=",", header=header, comments='', fmt=fmt)
+				print("Data appended to 'gps_data.txt'.")
+				last_saved_indices['gps'] = gps_index + 1
+                
+                # htmlファイルに地図データを保存
+				lon = gps_data_to_save[:, 4]  # longitude
+				lat = gps_data_to_save[:, 3]  # latitude
+				# update_map(lat, lon, map_file=savedir + u"/gps_data.html")
+
+		except Exception as e:
+			print(f"An error occurred while saving data: {e}")
+
+# --- function GPS Device --------------------------------------
+
+# GPSからのNMEAデータを解析する関数
+def parse_gprmc(sentence):
+    match = re.match(
+        r'^\$GNRMC,(\d{6}\.\d+),([AV]),(\d{2})(\d{2}\.\d+),([NS]),(\d{3})(\d{2}\.\d+),([EW]),.*?,(\d{6}),', sentence)
+    if match:
+        time_utc = match.group(1)  # UTC時刻
+        status = match.group(2)
+        lat_deg = match.group(3)
+        lat_min = match.group(4)
+        lat_dir = match.group(5)
+        lon_deg = match.group(6)
+        lon_min = match.group(7)
+        lon_dir = match.group(8)
+        date_utc = match.group(9)  # UTC日付
+
+        if status == 'A':  # データが有効な場合
+            latitude = (float(lat_deg) + float(lat_min) / 60.0) * (-1 if lat_dir == 'S' else 1)
+            longitude = (float(lon_deg) + float(lon_min) / 60.0) * (-1 if lon_dir == 'W' else 1)
+            
+            # UTC時刻を秒単位に変換
+            hours = int(time_utc[:2])
+            minutes = int(time_utc[2:4])
+            seconds = float(time_utc[4:])
+            utc_time_seconds = np.float64(hours * 3600 + minutes * 60 + seconds)
+
+            # UTC日付を"yyyymmdd"として整数化（64ビットに収まる範囲で）
+            day = int(date_utc[:2])
+            month = int(date_utc[2:4])
+            year = int('20' + date_utc[4:6])  # 20xx年と仮定
+            utc_date = np.float64(year * 10000 + month * 100 + day)
+
+            return utc_date, utc_time_seconds, latitude, longitude
+    return None, None, None, None
+
+async def read_gps_data(serial_port, array, start_time):
+    try:
+        while True:
+            # データを非同期に読み取る
+            line = await asyncio.to_thread(serial_port.readline)
+            line = line.decode('ascii', errors='replace').strip()
+
+            if line.startswith('$GNRMC'):
+                utc_date, utc_time_seconds, lat, lon = parse_gprmc(line)
+                if utc_date is not None and utc_time_seconds is not None and lat is not None and lon is not None:
+
+                    # current_time = datetime.now()
+                    # pc_time = (current_time - start_time).total_seconds()
+                    current_time = int(time.time() * 1000)
+                    elapsed_time = np.float32(current_time - start_time)  # float32で記録
+                    # 共有メモリに保存
+                    index = np.where(array[:, 0] == 0)[0]
+                    if index.size > 0:
+                        index = index[0]
+                        array[index, :] = [elapsed_time, utc_date, utc_time_seconds, lat, lon]
+
+                    if index >= BUFFER_SIZE:
+                        print("Buffer full. Stopping logging.")
+                        return
+
+    except asyncio.CancelledError:
+        # 非同期処理がキャンセルされた場合
+        print("Logging stopped by user.")
+
+async def log_gps_data(shared_mem_name, start_time):
+    existing_shm = shared_memory.SharedMemory(name=shared_mem_name)
+    array = np.ndarray(GPS_SHAPE, dtype=GPS_DTYPE, buffer=existing_shm.buf)
+    with serial.Serial(GPS_PORT, GPS_BAUDRATE, timeout=GPS_TIMEOUT) as ser:
+        await read_gps_data(ser, array, start_time)
+
+def start_gps_receiver(shared_mem_name, start_time):
+    try:
+        asyncio.run(log_gps_data(shared_mem_name, start_time))
+
+    except KeyboardInterrupt:
+        print("GPS Process: Acquisition stopped by user.")
+
+# --- function shared_memory --------------------------------------
+
+def create_shared_memory(shape, dtype, shmname):
+    n_bytes = int(np.prod(shape) * np.dtype(dtype).itemsize)
+    shm = shared_memory.SharedMemory(create=True, size=n_bytes, name=shmname)
+    array = np.ndarray(shape, dtype=dtype, buffer=shm.buf)
+    array.fill(0)
+    return shm , array
+
+
+# --- function plotter --------------------------------------
 
 # フラグ判定モード（"circle"=円判定, "line"=ライン判定）
 # flag_mode = "circle"
@@ -210,12 +425,12 @@ def crosses_any_line(prev_lat, prev_lon, curr_lat, curr_lon, line_segments):
     return False, 0  # どのラインもまたいでいない
 
 
-def start_plotting_one_figure(shared_mem_name_GPS):
+def start_plotting_one_figure(shared_mem_name_GPS,shared_mem_name_FLG):
 
 
     # ser = serial.Serial("COM18",921600)
-    if CON.USEFLAG_Hap:
-        ser = serial.Serial("/dev/ttyACM0",921600) # Rasberry Pi
+    if USEFLAG_Hap:
+        ser = serial.Serial(GPS_PORT,921600) # Rasberry Pi
     delay_HapOn = 0 # 単位：sec
 
     activate_flag = 0
@@ -225,10 +440,6 @@ def start_plotting_one_figure(shared_mem_name_GPS):
     current_time = 0
     flag_on_time = 0
     flag_HapOn = 0 
-
-    config = read_config()
-    USEFLAG_GPS        = int(config['DEFAULT']['USEFLAG_GPS'])
-    FIGFLAG	           = int(config['DEFAULT']['FIGFLAG'])
 
     sns.set_style("darkgrid")
     sns.set_palette("dark")
@@ -250,7 +461,7 @@ def start_plotting_one_figure(shared_mem_name_GPS):
     if USEFLAG_GPS:
         # print("USEFLAG_GPS",USEFLAG_GPS)
         existing_shm_GPS = shared_memory.SharedMemory(name=shared_mem_name_GPS)
-        array_GPS = np.ndarray(CON.GPS_SHAPE, dtype=CON.GPS_DTYPE, buffer=existing_shm_GPS.buf)
+        array_GPS = np.ndarray(GPS_SHAPE, dtype=GPS_DTYPE, buffer=existing_shm_GPS.buf)
 
         ax12 = fig.add_subplot(gs[0:4, 0:2])
 
@@ -395,3 +606,92 @@ def start_plotting_one_figure(shared_mem_name_GPS):
             # activate_flag の状態を保存
             activate_flag_prev = activate_flag
 
+
+def main():
+	global gps_process, plot_gps_process
+	global gps_array,flg_array
+	global plot_one_figure_process
+
+
+
+	start_time = int(time.time() * 1000)
+
+    # 定期的にデータを保存するスレッドを開始
+	save_thread = threading.Thread(target=save_data_periodically, args=(SAVEINTERVAL,))
+	save_thread.start()
+
+	"""共有メモリの作成"""
+	gps_shared_mem, gps_array = create_shared_memory(GPS_SHAPE, GPS_DTYPE, "SHM_GPS")
+	gps_shared_mem_name = gps_shared_mem.name
+	flg_shared_mem, flg_array = create_shared_memory(FLG_SHAPE, FLG_DTYPE, "SHM_FLG")
+	flg_shared_mem_name = flg_shared_mem.name
+
+	print(gps_shared_mem_name)
+	print(flg_shared_mem_name)
+
+	"""プロセスの定義"""
+	if USEFLAG_GPS:
+		gps_process				 = Process(target=start_gps_receiver, 			args=(gps_shared_mem_name,start_time))
+		# plot_gps_process		 = Process(target=start_plotting_gps, 			args=(gps_shared_mem_name,bio_shared_mem_LFHF_name,))
+
+	plot_one_figure_process = Process(target=start_plotting_one_figure,		    args=(gps_shared_mem_name,flg_shared_mem_name,))
+
+	"""実行"""
+	try:
+		"""プロセススタート"""
+		if USEFLAG_GPS:
+			gps_process.start()
+			# if FIGFLAG:
+			# 	plot_gps_process.start()
+		if FIGFLAG:
+			print("Plot Process started")
+			plot_one_figure_process.start()
+
+		if USEFLAG_GPS:
+			gps_process.join()
+			# if FIGFLAG:
+			# 	plot_gps_process.terminate()
+
+		plot_one_figure_process.join()
+
+
+	except KeyboardInterrupt:
+		"""キーボードが押されたら終了する"""
+		stop_processes()
+
+	finally:
+		"""終了前に保存処理する"""
+		print("Saving Data...")
+		try:
+			save_data()  # 終了時にもデータを保存
+
+		except Exception as e:
+			print(f"An error occurred while saving data: {e}")
+
+		"""終了前に共有メモリを解放する"""
+		try:
+			if USEFLAG_GPS:
+				gps_shared_mem.close()
+				gps_shared_mem.unlink()
+				print(f"Shared memories(GPS	  ) '{gps_shared_mem_name}' have been successfully deleted.")
+				print(f"Shared memories(FLG	  ) '{flg_shared_mem_name}' have been successfully deleted.")
+
+		except FileNotFoundError:
+			if USEFLAG_GPS:
+				print(f"Shared memories(GPS) '{gps_shared_mem_name}' do not exist or have already been deleted.")
+				print(f"Shared memories(FLG) '{flg_shared_mem_name}' do not exist or have already been deleted.")
+
+		except Exception as e:
+			print(f"An error occurred: {e}")
+
+		print("Finish!!!")
+		print("Wait... Saving Data")
+
+
+
+
+
+if __name__ == "__main__":
+    # bind_bluetooth()
+    exit_code = main()
+    sys.exit(exit_code)

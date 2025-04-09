@@ -92,8 +92,9 @@ GPS_DTYPE = np.float64
 # GPS_PORT        = "COM9" #README_hmを参照して設定
 # GPS_PORT        = "COM5" # mtsuzki home PC & stick PC
 # GPS_PORT        = "COM6" # Tough Book Takakura
-GPS_PORT        = "COM14" # Tough Book GPS_1 
+# GPS_PORT        = "COM14" # Tough Book GPS_1 
 # GPS_PORT        = "COM16" # Tough Book GPS_2
+GPS_PORT        = "/dev/rfcomm0" # RasberryPi
 GPS_BAUDRATE    = 9600
 GPS_TIMEOUT     = 1
 
@@ -204,4 +205,8 @@ DEBUGFLAG_CAN_SEND = 0
 DEBUGFLAG_CAN_RCVE = 0
 DEBUGFLAG_CAN_RCVE_VERIFICATION = 0
 
-SAVEINTERVAL = 30 # ファイル保存間隔 [sec]
+SAVEINTERVAL = 10 # ファイル保存間隔 [sec]
+
+
+# ハプティックデバイス
+USEFLAG_Hap = 0
