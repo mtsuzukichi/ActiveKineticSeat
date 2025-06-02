@@ -94,7 +94,8 @@ GPS_DTYPE = np.float64
 # GPS_PORT        = "COM6" # Tough Book Takakura
 # GPS_PORT        = "COM14" # Tough Book GPS_1 
 # GPS_PORT        = "COM16" # Tough Book GPS_2
-GPS_PORT        = "/dev/rfcomm0" # RasberryPi
+GPS_PORT        = "COM17" # Tough Book GPS_APD 
+# GPS_PORT        = "/dev/rfcomm0" # RasberryPi
 GPS_BAUDRATE    = 9600
 GPS_TIMEOUT     = 1
 
@@ -209,4 +210,4 @@ SAVEINTERVAL = 10 # ファイル保存間隔 [sec]
 
 
 # ハプティックデバイス
-USEFLAG_Hap = 0
+USEFLAG_Hap = 1
